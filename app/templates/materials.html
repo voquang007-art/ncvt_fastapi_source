@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Danh mục vật tư{% endblock %}
+{% block content %}
+<h2>Danh mục vật tư</h2>
+
+{% if request.query_params.get('error') == 'invalid_template' %}
+    <div class="alert">
+        File Excel không đúng cấu trúc. Hệ thống chấp nhận 2 dạng:
+        <br>
+        1. Có tiêu đề cột: Mã vật tư | Tên vật tư | Đơn vị tính | Loại vật tư.
+        <br>
+        2. Không có tiêu đề: Cột A là Mã vật tư, cột B là Tên vật tư, cột C là Đơn vị tính, cột D là Loại vật tư.
+    </div>
+{% elif request.query_params.get('error') == 'empty_file' %}
+    <div class="alert">File Excel rỗng hoặc chưa được tải lên hệ thống.</div>
+{% elif request.query_params.get('error') == 'invalid_excel' %}
+    <div class="alert">File tải lên không đọc được. Vui lòng kiểm tra lại định dạng .xlsx.</div>
+{% endif %}
+
+{% if request.query_params.get('imported') %}
+    <div class="alert success">
+        Đã import {{ request.query_params.get('imported') }} dòng vật tư.
+        Bỏ qua {{ request.query_params.get('skipped', '0') }} dòng không đủ dữ liệu.
+    </div>
+{% endif %}
+
+<section class="card">
+    <form method="get" class="inline-form">
+        <input name="q" value="{{ q }}" placeholder="Tìm mã, tên vật tư">
+
+        <select name="category">
+            <option value="">-- Tất cả loại vật tư --</option>
+            {% for item in categories %}
+                <option value="{{ item }}" {% if selected_category == item %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+        </select>
+
+        <button>Tìm kiếm</button>
+        {% if q or selected_category %}
+            <a class="button secondary" href="/materials">Bỏ lọc</a>
+        {% endif %}
+    </form>
+</section>
+
+{% if can_manage %}
+<section class="card">
+    <h3>Thêm/cập nhật vật tư</h3>
+    <form method="post" action="/materials/create" class="grid-form" style="grid-template-columns: 160px minmax(320px, 1fr) 110px 180px 220px minmax(220px, 1fr);">
+        <input name="code" placeholder="Mã vật tư" required>
+        <input name="name" placeholder="Tên vật tư" required>
+        <input name="unit" placeholder="Đơn vị tính" required>
+        <input name="category_name" placeholder="Loại vật tư" required>
+        <input name="specification" placeholder="Quy cách">
+        <input name="note" placeholder="Ghi chú">
+        <button style="grid-column: 1 / 2; width: 140px;">Ghi danh mục</button>
+    </form>
+</section>
+
+<section class="card">
+    <p><b>Tổng số vật tư đang hiển thị:</b> {{ materials|length }}</p>
+</section>
+
+<section class="card">
+    <h3>Import Excel danh mục</h3>
+    <form method="post" action="/materials/import" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".xlsx" required>
+        <button>Import</button>
+    </form>
+</section>
+{% endif %}
+
+<section class="card">
+    <table style="table-layout: fixed;">
+        <colgroup>
+            <col style="width: 6ch;">
+            <col style="width: 27ch;">
+            <col style="width: auto;">
+            <col style="width: 8ch;">
+            <col style="width: 14ch;">
+            <col style="width: 20ch;">
+        </colgroup>
+        <thead>
+        <tr><th>STT</th><th>Mã</th><th>Tên vật tư</th><th>ĐVT</th><th>Loại</th><th>Quy cách</th></tr>
+        </thead>
+        <tbody>
+        {% for m in materials %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ m.code }}</td>
+            <td>{{ m.name }}</td>
+            <td>{{ m.unit }}</td>
+            <td>{{ m.category_name }}</td>
+            <td>{{ m.specification or '' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

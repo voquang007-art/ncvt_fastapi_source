@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng nhập</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+<style>
+/* Chỉ chỉnh riêng trang đăng nhập, không đụng CSS chung */
+.login-page {
+    background-image: linear-gradient(rgba(2, 6, 23, 0.34), rgba(2, 6, 23, 0.34)), url('/static/branding/login_bg.jpg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+}
+.login-box {
+    width: 500px;
+    max-width: 96vw;
+    background: rgba(255, 255, 255, 0.78) !important;
+    backdrop-filter: blur(3px);
+}
+.login-box .hospital-title {
+    font-family: "Times New Roman", Times, serif !important;
+    white-space: nowrap !important;
+    font-size: 28px !important;
+    line-height: 1.15;
+}
+.login-box label {
+    font-weight: 700;
+    color: #111827;
+}
+.login-box input,
+.login-box select {
+    background: rgba(255, 255, 255, 0.92) !important;
+    color: #111827;
+}
+.password-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.password-field input {
+    padding-right: 46px;
+}
+.password-toggle {
+    position: absolute;
+    right: 8px;
+    width: 34px;
+    min-width: 34px;
+    height: 30px;
+    padding: 0;
+    margin: 0;
+    border-radius: 6px;
+    line-height: 30px;
+    text-align: center;
+}
+@media (max-width: 640px) {
+    .login-box .hospital-title {
+        white-space: normal !important;
+        font-size: 22px !important;
+    }
+}
+</style>
+
+</head>
+<body class="login-page">
+<div class="login-box">
+    <div class="login-logo-wrap">
+        <img src="/static/branding/logo.png" alt="Logo bệnh viện" class="login-logo">
+    </div>
+    <div class="hospital-title">BỆNH VIỆN HÙNG VƯƠNG GIA LAI</div>
+    <div class="hospital-subtitle">Phần mềm đăng ký nhu cầu vật tư</div>
+    <h2>Đăng nhập</h2>
+
+    <div id="login-message-wrap">
+        {% if message %}<div class="alert success">{{ message }}</div>{% endif %}
+        {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    </div>
+
+    <form id="login-form" method="post" action="/login">
+        <label>Tên đăng nhập</label>
+        <input name="username" required>
+        <label>Mật khẩu</label>
+        <div class="password-field">
+            <input id="login-password" name="password" type="password" required>
+            <button class="password-toggle" type="button" data-target="login-password" aria-label="Hiển thị hoặc ẩn mật khẩu">👁</button>
+        </div>
+        <button type="submit">Đăng nhập</button>
+    </form>
+
+    <div class="link-row"><a href="/register">Đăng ký tài khoản</a></div>
+    <div class="login-footer-note">Tài khoản mặc định: admin / Admin@123</div>
+    <div class="login-footer-note">Ứng dụng được phát triển bởi Võ Như Minh Quang</div>
+</div>
+
+<script>
+const loginForm = document.getElementById('login-form');
+const loginMessageWrap = document.getElementById('login-message-wrap');
+
+function renderLoginMessage(message, success=false) {
+    loginMessageWrap.innerHTML = `<div class="alert ${success ? 'success' : ''}">${message}</div>`;
+}
+
+loginForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const formData = new FormData(loginForm);
+    const response = await fetch('/login', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+        renderLoginMessage(data.message || 'Không đăng nhập được.');
+        return;
+    }
+    window.location.href = data.redirect || '/requests';
+});
+
+function bindPasswordToggle() {
+    document.querySelectorAll('.password-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const input = document.getElementById(btn.dataset.target);
+            if (!input) return;
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            btn.textContent = showing ? '👁' : 'Ẩn';
+        });
+    });
+}
+bindPasswordToggle();
+
+</script>
+</body>
+</html>

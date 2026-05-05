@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Lập phiếu{% endblock %}
+{% block content %}
+<h2>{% if req %}Sửa phiếu {{ req.request_no }}{% else %}Lập phiếu đăng ký nhu cầu vật tư{% endif %}</h2>
+
+{% if balance_locked %}
+<div class="alert">Tháng này đã chốt/lưu cân đối tồn kho. Phiếu đã khóa nghiệp vụ, không được sửa nội dung/số lượng. Chỉ được xem và xuất PDF.</div>
+{% elif not editable %}
+<div class="alert">Phiếu đang ở trạng thái không cho phép đơn vị sửa. Chỉ Bộ phận tổng hợp/Quản trị hệ thống mới được mở điều chỉnh.</div>
+{% endif %}
+
+<form method="post" action="{% if req %}/requests/{{ req.id }}/update{% else %}/requests/create{% endif %}">
+<section class="card grid-form">
+    <label>Đơn vị lập phiếu</label>
+    <select id="unit-id" name="unit_id" {% if current_user.role not in ['ADMIN','SUMMARY','APPROVER'] %}disabled{% endif %}>
+        {% for unit in units %}
+            <option value="{{ unit.id }}" {% if (req and req.unit_id == unit.id) or (not req and current_user.unit_id == unit.id) %}selected{% endif %}>{{ unit.name }}</option>
+        {% endfor %}
+    </select>
+    {% if current_user.role not in ['ADMIN','SUMMARY','APPROVER'] %}
+        <input type="hidden" id="unit-id-hidden" name="unit_id" value="{{ current_user.unit_id }}">
+    {% endif %}
+
+    <label>Tháng</label>
+    <input type="number" name="month" min="1" max="12" value="{{ req.month if req else today.month }}" required>
+    <label>Năm</label>
+    <input type="number" name="year" value="{{ req.year if req else today.year }}" required>
+    <label>Ngày lập</label>
+    <input type="date" name="request_date" value="{{ req.request_date if req else today }}" required>
+    <label>Người lập phiếu</label>
+    <input name="input_person_name" value="{{ req.input_person_name if req else current_user.full_name }}" required>
+
+    <div class="full-span">
+        <label>Phụ trách khoa/phòng</label>
+        <div class="field-with-actions">
+            <input id="unit-head-name" name="unit_head_name" value="{{ req.unit_head_name if req else unit_head_default }}" data-from-default="1">
+            <button type="button" class="secondary" id="save-unit-head-btn">Lưu</button>
+            <button type="button" class="danger" id="clear-unit-head-btn">Xóa</button>
+        </div>
+        <div id="unit-head-message" class="small-note">Thông tin này được lưu một lần theo đơn vị và tự lấy lên khi in PDF.</div>
+    </div>
+
+    <label>Ghi chú chung</label>
+    <input name="note" value="{{ req.note if req else '' }}">
+</section>
+
+<section class="card">
+    <div class="page-title">
+        <h3>Chi tiết vật tư</h3>
+        <button type="button" onclick="addRow()">Thêm dòng</button>
+    </div>
+    <div class="table-scroll">
+        <table id="items-table" style="table-layout: fixed;">
+            <colgroup>
+                <col style="width: 6ch;">
+                <col style="width: auto;">
+                <col style="width: 16ch;">
+                <col style="width: 9ch;">
+                <col style="width: 12ch;">
+                <col style="width: 16ch;">
+                <col style="width: 18ch;">
+                <col style="width: 10ch;">
+                <col style="width: 7ch;">
+            </colgroup>
+            <thead><tr><th>STT</th><th>Danh mục</th><th>Mã sản phẩm</th><th>ĐVT</th><th>Số lượng</th><th>Loại HH</th><th>Quy cách</th><th>Ngoài danh mục</th><th></th></tr></thead>
+            <tbody>
+            {% for item in items %}
+            <tr>
+                <td class="stt-cell row-index" style="text-align:center;">{{ loop.index }}</td>
+                <td>
+                    <input type="hidden" name="material_id" value="{{ item.material_id or '' }}">
+                    <input name="material_name" value="{{ item.material_name }}" required>
+                </td>
+                <td><input name="material_code" value="{{ item.material_code or '' }}"></td>
+                <td><input name="unit" value="{{ item.unit }}" required style="min-width:0;text-align:center;width:100%;"></td>
+                <td><input name="quantity" type="number" step="0.01" min="0.01" value="{{ item.quantity }}" required style="min-width:0;text-align:center;width:100%;"></td>
+                <td><input name="category_name" value="{{ item.category_name }}" required></td>
+                <td><input name="specification" value="{{ item.specification or item.note or '' }}"></td>
+                <td style="text-align:center"><input type="checkbox" name="is_new_material" value="{{ loop.index0 }}" {% if item.is_new_material %}checked{% endif %}></td>
+                <td><button type="button" onclick="removeRow(this)">Xóa</button></td>
+                <input type="hidden" name="item_note" value="">
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card form-actions">
+    <button {% if not editable %}disabled{% endif %}>Lưu phiếu</button>
+    <a class="button secondary" href="/requests">Quay lại</a>
+</section>
+</form>
+
+<datalist id="materials-list">
+{% for m in materials %}
+    <option value="{{ m.name }}" data-id="{{ m.id }}" data-code="{{ m.code }}" data-unit="{{ m.unit }}" data-category="{{ m.category_name }}" data-spec="{{ m.specification or '' }}">{{ m.code }} | {{ m.unit }} | {{ m.category_name }}</option>
+{% endfor %}
+</datalist>
+
+<datalist id="materials-code-list">
+{% for m in materials %}
+    <option value="{{ m.code }}" data-id="{{ m.id }}" data-name="{{ m.name }}" data-unit="{{ m.unit }}" data-category="{{ m.category_name }}" data-spec="{{ m.specification or '' }}">{{ m.name }} | {{ m.unit }} | {{ m.category_name }}</option>
+{% endfor %}
+</datalist>
+
+<script>
+const unitDefaults = {{ unit_defaults | tojson }};
+const unitSelect = document.getElementById('unit-id');
+const unitHeadInput = document.getElementById('unit-head-name');
+const saveUnitHeadBtn = document.getElementById('save-unit-head-btn');
+const clearUnitHeadBtn = document.getElementById('clear-unit-head-btn');
+const unitHeadMessage = document.getElementById('unit-head-message');
+
+function getSelectedUnitId() {
+    return unitSelect ? unitSelect.value : (document.getElementById('unit-id-hidden')?.value || '');
+}
+
+function showUnitHeadMessage(message, success=true) {
+    unitHeadMessage.innerHTML = `<span class="${success ? 'muted' : 'alert'}">${message}</span>`;
+}
+
+function setUnitHeadValue(value) {
+    unitHeadInput.value = value || '';
+    unitHeadInput.dataset.fromDefault = '1';
+}
+
+unitHeadInput.addEventListener('input', function () {
+    unitHeadInput.dataset.fromDefault = '0';
+});
+
+unitSelect?.addEventListener('change', async function () {
+    const unitId = getSelectedUnitId();
+    try {
+        const response = await fetch(`/requests/api/unit-head-default?unit_id=${unitId}`);
+        const data = await response.json();
+        if (response.ok && data.ok) {
+            if (!unitHeadInput.value || unitHeadInput.dataset.fromDefault === '1') {
+                setUnitHeadValue(data.unit_head_name || '');
+            }
+        }
+    } catch (error) {
+        console.error(error);
+    }
+});
+
+saveUnitHeadBtn.addEventListener('click', async function () {
+    const formData = new FormData();
+    formData.append('unit_id', getSelectedUnitId());
+    formData.append('unit_head_name', unitHeadInput.value || '');
+    const response = await fetch('/requests/unit-head-default/save', {
+        method: 'POST',
+        body: formData,
+    });
+    const data = await response.json();
+    showUnitHeadMessage(data.message || 'Không lưu được.', response.ok && data.ok);
+    if (response.ok && data.ok) {
+        unitDefaults[getSelectedUnitId()] = data.unit_head_name || '';
+        setUnitHeadValue(data.unit_head_name || '');
+    }
+});
+
+clearUnitHeadBtn.addEventListener('click', async function () {
+    const formData = new FormData();
+    formData.append('unit_id', getSelectedUnitId());
+    const response = await fetch('/requests/unit-head-default/clear', {
+        method: 'POST',
+        body: formData,
+    });
+    const data = await response.json();
+    showUnitHeadMessage(data.message || 'Không xóa được.', response.ok && data.ok);
+    if (response.ok && data.ok) {
+        unitDefaults[getSelectedUnitId()] = '';
+        setUnitHeadValue('');
+    }
+});
+
+function fillMaterialRow(tr, materialData) {
+    tr.querySelector('input[name="material_id"]').value = materialData.id || '';
+    tr.querySelector('input[name="material_name"]').value = materialData.name || '';
+    tr.querySelector('input[name="material_code"]').value = materialData.code || '';
+    tr.querySelector('input[name="unit"]').value = materialData.unit || '';
+    tr.querySelector('input[name="category_name"]').value = materialData.category || '';
+    tr.querySelector('input[name="specification"]').value = materialData.spec || '';
+
+    const cb = tr.querySelector('input[type="checkbox"][name="is_new_material"]');
+    if (cb) cb.checked = false;
+}
+
+function bindMaterialInput(input) {
+    input.setAttribute('list', 'materials-list');
+    input.addEventListener('change', function () {
+        const val = this.value;
+        const opts = document.querySelectorAll('#materials-list option');
+        for (const opt of opts) {
+            if (opt.value === val) {
+                fillMaterialRow(this.closest('tr'), {
+                    id: opt.dataset.id || '',
+                    name: opt.value || '',
+                    code: opt.dataset.code || '',
+                    unit: opt.dataset.unit || '',
+                    category: opt.dataset.category || '',
+                    spec: opt.dataset.spec || '',
+                });
+                return;
+            }
+        }
+    });
+}
+
+function bindMaterialCodeInput(input) {
+    input.setAttribute('list', 'materials-code-list');
+    input.addEventListener('change', function () {
+        const val = this.value;
+        const opts = document.querySelectorAll('#materials-code-list option');
+        for (const opt of opts) {
+            if (opt.value === val) {
+                fillMaterialRow(this.closest('tr'), {
+                    id: opt.dataset.id || '',
+                    name: opt.dataset.name || '',
+                    code: opt.value || '',
+                    unit: opt.dataset.unit || '',
+                    category: opt.dataset.category || '',
+                    spec: opt.dataset.spec || '',
+                });
+                return;
+            }
+        }
+    });
+}
+function refreshCheckboxValues() {
+    document.querySelectorAll('#items-table tbody tr').forEach(function (tr, idx) {
+        const idxCell = tr.querySelector('.row-index');
+        if (idxCell) idxCell.textContent = idx + 1;
+
+        const cb = tr.querySelector('input[type="checkbox"][name="is_new_material"]');
+        if (cb) cb.value = idx;
+    });
+}
+
+function removeRow(btn) {
+    btn.closest('tr').remove();
+    refreshCheckboxValues();
+}
+
+function addRow() {
+    const tbody = document.querySelector('#items-table tbody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="stt-cell row-index" style="text-align:center;"></td>
+        <td><input type="hidden" name="material_id" value=""><input name="material_name" required></td>
+        <td><input name="material_code"></td>
+        <td><input name="unit" required style="min-width:0;text-align:center;width:100%;"></td>
+        <td><input name="quantity" type="number" step="0.01" min="0.01" required style="min-width:0;text-align:center;width:100%;"></td>
+        <td><input name="category_name" required></td>
+        <td><input name="specification"></td>
+        <td style="text-align:center"><input type="checkbox" name="is_new_material"></td>
+        <td><button type="button" onclick="removeRow(this)">Xóa</button></td>
+        <input type="hidden" name="item_note" value="">
+    `;
+    tbody.appendChild(tr);
+    bindMaterialInput(tr.querySelector('input[name="material_name"]'));
+    bindMaterialCodeInput(tr.querySelector('input[name="material_code"]'));
+    refreshCheckboxValues();
+}
+
+document.querySelectorAll('input[name="material_name"]').forEach(bindMaterialInput);
+document.querySelectorAll('input[name="material_code"]').forEach(bindMaterialCodeInput);
+if (document.querySelectorAll('#items-table tbody tr').length === 0) {
+    addRow();
+}
+</script>
+{% endblock %}

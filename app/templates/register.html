@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng ký</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+<style>
+/* Chỉ chỉnh riêng trang đăng ký, không đụng CSS chung */
+.login-page {
+    background-image: linear-gradient(rgba(2, 6, 23, 0.34), rgba(2, 6, 23, 0.34)), url('/static/branding/login_bg.jpg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+}
+.login-box {
+    width: 500px;
+    max-width: 96vw;
+    background: rgba(255, 255, 255, 0.78) !important;
+    backdrop-filter: blur(3px);
+}
+.login-box .hospital-title {
+    font-family: "Times New Roman", Times, serif !important;
+    white-space: nowrap !important;
+    font-size: 28px !important;
+    line-height: 1.15;
+}
+.login-box label {
+    font-weight: 700;
+    color: #111827;
+}
+.login-box input,
+.login-box select {
+    background: rgba(255, 255, 255, 0.92) !important;
+    color: #111827;
+}
+.password-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.password-field input {
+    padding-right: 46px;
+}
+.password-toggle {
+    position: absolute;
+    right: 8px;
+    width: 34px;
+    min-width: 34px;
+    height: 30px;
+    padding: 0;
+    margin: 0;
+    border-radius: 6px;
+    line-height: 30px;
+    text-align: center;
+}
+@media (max-width: 640px) {
+    .login-box .hospital-title {
+        white-space: normal !important;
+        font-size: 22px !important;
+    }
+}
+</style>
+
+</head>
+<body class="login-page">
+<div class="login-box">
+    <div class="login-logo-wrap">
+        <img src="/static/branding/logo.png" alt="Logo bệnh viện" class="login-logo">
+    </div>
+    <div class="hospital-title">BỆNH VIỆN HÙNG VƯƠNG GIA LAI</div>
+    <div class="hospital-subtitle">Phần mềm đăng ký nhu cầu vật tư</div>
+    <h2>Đăng ký tài khoản</h2>
+
+    <div id="register-message-wrap">
+        {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+        {% if message %}<div class="alert success">{{ message }}</div>{% endif %}
+        {% if not units %}
+            <div class="alert">Chưa có đơn vị hoạt động. Vui lòng liên hệ Quản trị hệ thống để lập đơn vị trước khi đăng ký.</div>
+        {% endif %}
+    </div>
+
+    <form id="register-form" method="post" action="/register">
+        <label>Tên đăng nhập</label>
+        <input name="username" required>
+        <label>Họ tên</label>
+        <input name="full_name" required>
+        <label>Mật khẩu</label>
+        <div class="password-field">
+            <input id="register-password" name="password" type="password" required>
+            <button class="password-toggle" type="button" data-target="register-password" aria-label="Hiển thị hoặc ẩn mật khẩu">👁</button>
+        </div>
+        <label>Đơn vị</label>
+        <select name="unit_id" required {% if not units %}disabled{% endif %}>
+            <option value="">-- Chọn đơn vị --</option>
+            {% for unit in units %}
+                <option value="{{ unit.id }}">{{ unit.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" {% if not units %}disabled{% endif %}>Gửi đăng ký</button>
+    </form>
+
+    <div class="link-row"><a href="/login">Quay lại đăng nhập</a></div>
+    <div class="login-footer-note">Ứng dụng được phát triển bởi Võ Như Minh Quang</div>
+</div>
+
+<script>
+const registerForm = document.getElementById('register-form');
+const registerMessageWrap = document.getElementById('register-message-wrap');
+
+function renderRegisterMessage(message, success=false) {
+    registerMessageWrap.innerHTML = `<div class="alert ${success ? 'success' : ''}">${message}</div>`;
+}
+
+registerForm?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const formData = new FormData(registerForm);
+    const response = await fetch('/register', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+        renderRegisterMessage(data.message || 'Không đăng ký được.');
+        return;
+    }
+    renderRegisterMessage(data.message || 'Đăng ký thành công.', true);
+    setTimeout(function () {
+        window.location.href = data.redirect || '/login';
+    }, 900);
+});
+
+function bindPasswordToggle() {
+    document.querySelectorAll('.password-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const input = document.getElementById(btn.dataset.target);
+            if (!input) return;
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            btn.textContent = showing ? '👁' : 'Ẩn';
+        });
+    });
+}
+bindPasswordToggle();
+
+</script>
+</body>
+</html>

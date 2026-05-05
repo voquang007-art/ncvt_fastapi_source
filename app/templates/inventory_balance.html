@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Cân đối tồn kho{% endblock %}
+{% block content %}
+{% if request.query_params.get('error') == 'no_snapshot' %}
+<div class="alert">Chưa import tồn kho cho tháng {{ month }}/{{ year }}, không được chốt/lưu kết quả cân đối.</div>
+{% endif %}
+
+<div class="page-title">
+    <h2>Cân đối tồn kho tháng {{ month }}/{{ year }}</h2>
+    <a class="button" href="/inventory-balance/export.xlsx?month={{ month }}&year={{ year }}">Xuất Excel</a>
+</div>
+
+<section class="card">
+    <form method="get" class="inline-form">
+        <label>Tháng</label><input type="number" name="month" min="1" max="12" value="{{ month }}" required>
+        <label>Năm</label><input type="number" name="year" value="{{ year }}" required>
+        <button>Lọc</button>
+    </form>
+</section>
+
+<section class="card">
+    <h3>Import tồn kho phục vụ cân đối tháng {{ month }}/{{ year }}</h3>
+    <p class="muted">Mỗi tháng dùng 01 bảng tồn kho đang hiệu lực. Khi import lại, bảng tồn cũ của tháng này sẽ được lưu lịch sử và ngưng hiệu lực.</p>
+    <form method="post" action="/inventory-balance/import" enctype="multipart/form-data" class="grid-form">
+        <input type="hidden" name="month" value="{{ month }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <label>Ngày chốt tồn kho</label>
+        <input type="date" name="snapshot_date" value="{{ today }}" required>
+        <label>File Excel tồn kho</label>
+        <input type="file" name="file" accept=".xlsx" required>
+        <label>Ghi chú</label>
+        <input name="note" placeholder="Ví dụ: Tồn kho chốt cuối tháng trước">
+        <button>Import tồn kho tháng này</button>
+    </form>
+    <p class="muted">Mẫu cột bắt buộc: Mã vật tư, Tên vật tư, Đơn vị tính, Tồn kho. Cột tùy chọn: Loại vật tư/Loại HH, Ghi chú.</p>
+</section>
+
+<section class="card">
+    <h3>Thông tin tồn kho đang hiệu lực</h3>
+    {% if snapshot %}
+        <p><b>Ngày chốt tồn:</b> {{ snapshot.snapshot_date.strftime('%d/%m/%Y') }}</p>
+        <p><b>File nguồn:</b> {{ snapshot.source_file_name or '' }}</p>
+        <p><b>Thời điểm import:</b> {{ snapshot.imported_at }}</p>
+        <p><b>Ghi chú:</b> {{ snapshot.note or '' }}</p>
+    {% else %}
+        <div class="alert">Chưa import tồn kho cho tháng {{ month }}/{{ year }}. Hệ thống vẫn hiển thị nhu cầu nhưng chưa cân đối được tồn kho.</div>
+    {% endif %}
+</section>
+
+<section class="card">
+    <div class="page-title">
+        <h3>Bảng cân đối nhu cầu - tồn kho</h3>
+        <form method="post" action="/inventory-balance/save">
+            <input type="hidden" name="month" value="{{ month }}">
+            <input type="hidden" name="year" value="{{ year }}">
+            <button {% if not snapshot %}disabled title="Chưa import tồn kho cho tháng này"{% endif %}>Chốt/lưu kết quả cân đối</button>
+        </form>
+    </div>
+
+    {% if saved_count %}
+        <p class="muted">Đã lưu {{ saved_count }} dòng kết quả cân đối cho tháng này. Bấm chốt/lưu lại sẽ thay thế kết quả cũ.</p>
+    {% endif %}
+
+    <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:18px;">
+            Xem bảng cân đối nhu cầu - tồn kho
+            <span class="badge">{{ rows|length }} dòng</span>
+        </summary>
+
+        <div class="table-scroll" style="margin-top:12px;">
+            <table style="table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 5ch;">
+                    <col style="width: 24ch;">
+                    <col style="width: auto;">
+                    <col style="width: 14ch;">
+                    <col style="width: 9ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 14ch;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Mã vật tư</th>
+                        <th>Tên vật tư</th>
+                        <th>Loại</th>
+                        <th>ĐVT</th>
+                        <th>Tổng nhu cầu</th>
+                        <th>Tồn kho tháng</th>
+                        <th>Thiếu</th>
+                        <th>Dư</th>
+                        <th>Đề xuất mua</th>
+                        <th>Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in rows %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ r.material_code }}</td>
+                        <td>{{ r.material_name }}</td>
+                        <td>{{ r.category_name }}</td>
+                        <td>{{ r.unit }}</td>
+                        <td>{{ r.total_demand_qty }}</td>
+                        <td>{{ r.stock_qty }}</td>
+                        <td>{{ r.shortage_qty }}</td>
+                        <td>{{ r.surplus_qty }}</td>
+                        <td>{{ r.suggested_purchase_qty }}</td>
+                        <td>{{ r.status_note }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="11">Chưa có dữ liệu nhu cầu đã tổng hợp/chốt trong tháng này.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
+{% endblock %}

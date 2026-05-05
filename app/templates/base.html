@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Nhu cầu vật tư{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+<style>
+    .nav a {
+        padding: 8px 12px;
+        border-radius: 8px;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .nav a.active-tab {
+        background: #fff200;
+        color: #7c2d12 !important;
+        font-weight: 800;
+        box-shadow: inset 0 -2px 0 rgba(124, 45, 18, 0.35);
+    }
+
+    .nav a.active-tab:hover {
+        background: #fff45c;
+        color: #7c2d12 !important;
+        text-decoration: none;
+    }
+</style>
+</head>
+<body>
+<div class="app-shell">
+    <header class="brand-header">
+        <div class="brand-left">
+            <img src="/static/branding/logo.png" alt="Logo bệnh viện" class="brand-logo">
+            <div>
+                <div class="brand-title">BỆNH VIỆN HÙNG VƯƠNG GIA LAI</div>
+                <div class="brand-subtitle">Phần mềm đăng ký nhu cầu vật tư, văn phòng phẩm</div>
+            </div>
+        </div>
+        <div class="brand-user">
+            {% if current_user %}
+                <strong>{{ current_user.full_name }}</strong>
+                <span class="role-label">{{ ROLE_LABELS.get(current_user.role, current_user.role) }}</span>
+                <a href="/logout">Đăng xuất</a>
+            {% endif %}
+        </div>
+    </header>
+
+<nav class="nav">
+    {% if current_user %}
+        <a href="/requests"
+           class="{% if request.url.path.startswith('/requests') %}active-tab{% endif %}">
+            Phiếu đăng ký
+        </a>
+
+        <a href="/materials"
+           class="{% if request.url.path.startswith('/materials') %}active-tab{% endif %}">
+            Danh mục vật tư
+        </a>
+
+        {% if current_user.role in ['ADMIN','SUMMARY','APPROVER'] %}
+            <a href="/summary?month={{ NAV_MONTH }}&year={{ NAV_YEAR }}"
+               class="{% if request.url.path.startswith('/summary') %}active-tab{% endif %}">
+                Tổng hợp
+            </a>
+
+            <a href="/inventory-balance?month={{ NAV_MONTH }}&year={{ NAV_YEAR }}"
+               class="{% if request.url.path.startswith('/inventory-balance') %}active-tab{% endif %}">
+                Cân đối tồn kho
+            </a>
+        {% endif %}
+
+        {% if current_user.role == 'ADMIN' %}
+            <a href="/admin/users"
+               class="{% if request.url.path.startswith('/admin') %}active-tab{% endif %}">
+                Quản trị
+            </a>
+        {% endif %}
+    {% endif %}
+</nav>
+
+    <main id="main-content" class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-text">Ứng dụng được phát triển bởi Võ Như Minh Quang</div>
+    </footer>
+</div>
+
+{% if current_user and current_user.role in ['ADMIN','SUMMARY','APPROVER'] %}
+<script>
+(function () {
+    const REALTIME_REFRESH_INTERVAL_MS = 5000;
+    const realtimePaths = [
+        '/requests',
+        '/summary',
+        '/inventory-balance'
+    ];
+
+    function isRealtimePage() {
+        const path = window.location.pathname;
+
+        if (path === '/requests/new') {
+            return false;
+        }
+
+        if (/^\/requests\/\d+\/edit$/.test(path)) {
+            return false;
+        }
+
+        return realtimePaths.some(function (item) {
+            return path === item || path.startsWith(item + '/');
+        });
+    }
+
+    function isUserTypingOrSelecting() {
+        const active = document.activeElement;
+        if (!active) return false;
+
+        const tagName = active.tagName;
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function hasOpenDropdown() {
+        return Array.from(document.querySelectorAll('details')).some(function (item) {
+            return item.open;
+        });
+    }
+
+    function normalizeHtml(html) {
+        return String(html || '')
+            .replace(/_rt=\d+/g, '_rt=TIMESTAMP')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function extractMainContentFromHtml(htmlText) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+        return doc.querySelector('#main-content');
+    }
+
+    async function refreshMainContentIfChanged() {
+        if (!isRealtimePage()) return;
+        if (isUserTypingOrSelecting()) return;
+
+        const currentMain = document.querySelector('#main-content');
+        if (!currentMain) return;
+
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('_rt', String(Date.now()));
+
+        try {
+            const response = await fetch(currentUrl.toString(), {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) return;
+
+            const htmlText = await response.text();
+            const newMain = extractMainContentFromHtml(htmlText);
+            if (!newMain) return;
+
+            const oldHtml = normalizeHtml(currentMain.innerHTML);
+            const newHtml = normalizeHtml(newMain.innerHTML);
+
+            if (oldHtml === newHtml) return;
+
+            const shouldPreserveOpenDropdown = hasOpenDropdown();
+
+            currentMain.innerHTML = newMain.innerHTML;
+
+            if (shouldPreserveOpenDropdown) {
+                document.querySelectorAll('#main-content details').forEach(function (item) {
+                    item.open = true;
+                });
+            }
+
+            window.dispatchEvent(new CustomEvent('ncvt:main-content-refreshed'));
+        } catch (error) {
+            console.error('Lỗi tự đồng bộ màn hình:', error);
+        }
+    }
+
+    setInterval(refreshMainContentIfChanged, REALTIME_REFRESH_INTERVAL_MS);
+})();
+</script>
+{% endif %}
+</body>
+</html>

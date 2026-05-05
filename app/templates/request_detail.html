@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Chi tiết phiếu{% endblock %}
+{% block content %}
+{% if request.query_params.get('locked') == 'balance_return' %}
+<div class="alert">Phiếu này đã được đưa vào tổng hợp và tháng này đã chốt/lưu cân đối tồn kho, không được trả phiếu về đơn vị sửa.</div>
+{% elif request.query_params.get('locked') == 'balance_edit' %}
+<div class="alert">Phiếu này đã được đưa vào tổng hợp và tháng này đã chốt/lưu cân đối tồn kho, không được sửa nội dung/số lượng phiếu.</div>
+{% elif balance_locked %}
+<div class="alert">Phiếu này đã được đưa vào tổng hợp và tháng này đã chốt/lưu cân đối tồn kho. Phiếu đã khóa nghiệp vụ, chỉ được xem và xuất PDF. Nếu cần bổ sung phiếu khác cùng tháng, Bộ phận tổng hợp vẫn có thể đưa phiếu hợp lệ đó vào tổng hợp rồi chốt/lưu cân đối lại.</div>
+{% endif %}
+
+<div class="page-title">
+    <h2>{{ req.request_no }}</h2>
+    <div>
+        {% if not balance_locked %}
+            <a class="button secondary" href="/requests/{{ req.id }}/edit">Sửa</a>
+        {% endif %}
+        <a class="button" href="/requests/{{ req.id }}/pdf" target="_blank">Xuất PDF</a>
+    </div>
+</div>
+
+<section class="card">
+    <p><b>Đơn vị:</b> {{ req.unit.name }}</p>
+    <p><b>Tháng:</b> {{ req.month }}/{{ req.year }}</p>
+    <p><b>Ngày lập:</b> {{ req.request_date.strftime('%d/%m/%Y') }}</p>
+    <p><b>Người lập phiếu:</b> {{ req.input_person_name }}</p>
+    <p><b>Phụ trách khoa/phòng:</b> {{ req.unit_head_name or '' }}</p>
+    <p><b>Trạng thái:</b> <span class="status">{{ status_labels.get(req.status, req.status) }}</span></p>
+    {% if req.return_reason %}<p><b>Lý do trả lại:</b> {{ req.return_reason }}</p>{% endif %}
+</section>
+
+<section class="card">
+    <h3>Chi tiết vật tư</h3>
+    <div class="table-scroll">
+        <table>
+            <thead><tr><th>STT</th><th>Danh mục</th><th>Mã sản phẩm</th><th>ĐVT</th><th>Số lượng</th><th>Loại HH</th><th>Quy cách/Ghi chú</th></tr></thead>
+            <tbody>
+            {% for item in req.items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.material_name }} {% if item.is_new_material %}<span class="badge">Ngoài danh mục</span>{% endif %}</td>
+                <td>{{ item.material_code or 'Ngoài danh mục' }}</td>
+                <td>{{ item.unit }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.category_name }}</td>
+                <td>{{ item.specification or item.note or '' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% if not balance_locked %}
+<section class="card actions">
+    {% if req.status in ['DRAFT','RETURNED_FOR_EDIT','WAIT_UNIT_APPROVAL'] %}
+    <form method="post" action="/requests/{{ req.id }}/submit-summary">
+        <button>Gửi Bộ phận tổng hợp</button>
+    </form>
+    {% endif %}
+    {% if req.status == 'DRAFT' %}
+    <form method="post" action="/requests/{{ req.id }}/submit-unit">
+        <button class="secondary">Chuyển Trưởng đơn vị phê duyệt</button>
+    </form>
+    {% endif %}
+    {% if req.status == 'WAIT_UNIT_APPROVAL' and current_user.role in ['UNIT_HEAD','ADMIN'] %}
+    <form method="post" action="/requests/{{ req.id }}/unit-approve">
+        <button>Trưởng đơn vị phê duyệt</button>
+    </form>
+    {% endif %}
+    {% if current_user.role in ['ADMIN','SUMMARY','APPROVER'] %}
+        {% if req.status in ['SENT_TO_SUMMARY','RESUBMITTED'] %}
+        <form method="post" action="/requests/{{ req.id }}/summarize">
+            <button>Đưa vào tổng hợp</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/requests/{{ req.id }}/return-edit">
+            <input name="reason" placeholder="Lý do trả lại/cho điều chỉnh">
+            <button class="warning">Trả lại điều chỉnh</button>
+        </form>
+        {% if req.status == 'SUMMARIZED' %}
+        <form method="post" action="/requests/{{ req.id }}/close">
+            <button class="danger">Chốt phiếu</button>
+        </form>
+        {% endif %}
+    {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+    <h3>Sao chép sang tháng mới</h3>
+    <form method="post" action="/requests/{{ req.id }}/copy-next" class="inline-form">
+        <label>Tháng</label><input type="number" name="target_month" min="1" max="12" required>
+        <label>Năm</label><input type="number" name="target_year" required>
+        <button>Sao chép</button>
+    </form>
+</section>
+
+<section class="card">
+    <h3>Lịch sử xử lý</h3>
+    <div class="table-scroll">
+        <table>
+            <thead><tr><th>Thời điểm</th><th>Thao tác</th><th>Ghi chú</th></tr></thead>
+            <tbody>
+            {% for log in logs %}
+            <tr><td>{{ log.created_at.strftime('%d/%m/%Y %H:%M') if log.created_at else '' }}</td><td>{{ action_labels.get(log.action, log.action) }}</td><td>{{ log.note or '' }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

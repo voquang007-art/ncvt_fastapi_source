@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Phiếu đăng ký{% endblock %}
+{% block content %}
+<div class="page-title">
+    <h2>Phiếu đăng ký nhu cầu vật tư</h2>
+    <a class="button" href="/requests/new">Lập phiếu mới</a>
+</div>
+
+<section class="card">
+    <form method="get" class="inline-form">
+        <label>Tháng</label><input type="number" name="month" min="1" max="12" value="{{ month }}">
+        <label>Năm</label><input type="number" name="year" value="{{ year }}">
+        <button>Lọc</button>
+        {% if current_user.role in ['ADMIN','SUMMARY','APPROVER'] %}
+            <a class="button secondary" href="/summary?month={{ month }}&year={{ year }}">Xem tổng hợp</a>
+        {% endif %}
+    </form>
+</section>
+
+<section class="card">
+<table>
+    <thead>
+    <tr><th>Số phiếu</th><th>Đơn vị</th><th>Tháng</th><th>Người lập</th><th>Trưởng đơn vị</th><th>Trạng thái</th><th>Cảnh báo</th><th>Thao tác</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+        <td>{{ r.request_no }}</td>
+        <td>{{ r.unit.name }}</td>
+        <td>{{ r.month }}/{{ r.year }}</td>
+        <td>{{ r.input_person_name }}</td>
+        <td>{{ r.unit_head_name or '' }}</td>
+        <td><span class="status">{{ status_labels.get(r.status, r.status) }}</span></td>
+        <td>
+            {% if r.id in balance_locked_ids %}
+                <span class="badge">Đã khóa cân đối</span>
+            {% elif r.status in ['SENT_TO_SUMMARY','RESUBMITTED'] %}
+                <span class="badge">Chờ đưa vào tổng hợp</span>
+            {% elif has_balance_result and r.status in ['DRAFT','WAIT_UNIT_APPROVAL','RETURNED_FOR_EDIT'] %}
+                <span class="badge">Ngoài cân đối hiện tại</span>
+            {% else %}
+                <span class="muted">—</span>
+            {% endif %}
+        </td>
+        <td>
+            <a href="/requests/{{ r.id }}">Xem</a>
+            {% if r.id not in balance_locked_ids %}
+                <a href="/requests/{{ r.id }}/edit">Sửa</a>
+            {% endif %}
+            <a href="/requests/{{ r.id }}/pdf" target="_blank">PDF</a>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</section>
+{% endblock %}

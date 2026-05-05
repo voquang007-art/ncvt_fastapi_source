@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Tổng hợp{% endblock %}
+{% block content %}
+<div class="page-title">
+    <h2>Tổng hợp nhu cầu vật tư tháng {{ month }}/{{ year }}</h2>
+    <a class="button" href="/summary/export.xlsx?month={{ month }}&year={{ year }}">Xuất Excel</a>
+</div>
+
+<section class="card">
+    <form method="get" class="inline-form">
+        <label>Tháng</label><input type="number" name="month" min="1" max="12" value="{{ month }}">
+        <label>Năm</label><input type="number" name="year" value="{{ year }}">
+        <button>Lọc</button>
+    </form>
+</section>
+
+{% if pending_requests %}
+<section class="card">
+    <div class="alert">
+        Còn {{ pending_requests|length }} phiếu đã gửi Bộ phận tổng hợp nhưng chưa được đưa vào tổng hợp.
+        Nếu xuất tổng hợp hoặc chốt/lưu cân đối lúc này, số liệu có thể chưa phản ánh đầy đủ nhu cầu thực tế.
+    </div>
+
+    <details>
+        <summary style="cursor:pointer; font-weight:700;">
+            Xem danh sách phiếu chờ đưa vào tổng hợp
+        </summary>
+        <div class="table-scroll" style="margin-top:12px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Số phiếu</th>
+                        <th>Đơn vị</th>
+                        <th>Tháng</th>
+                        <th>Người lập</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in pending_requests %}
+                    <tr>
+                        <td>{{ item.request_no }}</td>
+                        <td>{{ item.unit.name }}</td>
+                        <td>{{ item.month }}/{{ item.year }}</td>
+                        <td>{{ item.input_person_name }}</td>
+                        <td>{{ item.status }}</td>
+                        <td><a href="/requests/{{ item.id }}">Xem</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
+{% endif %}
+
+<section class="card">
+    <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:18px;">
+            Tổng hợp theo vật tư
+            <span class="badge">{{ rows|length }} dòng</span>
+        </summary>
+
+        <div class="table-scroll" style="margin-top:12px;">
+            <table style="table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 5ch;">
+                    <col style="width: 28ch;">
+                    <col style="width: auto;">
+                    <col style="width: 14ch;">
+                    <col style="width: 7ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 8ch;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Mã vật tư</th>
+                        <th>Tên vật tư</th>
+                        <th>Loại</th>
+                        <th>ĐVT</th>
+                        <th>Tổng số lượng</th>
+                        <th>Số đơn vị</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in rows %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ r.material_code }}</td>
+                        <td>{{ r.material_name }}</td>
+                        <td>{{ r.category_name }}</td>
+                        <td>{{ r.unit }}</td>
+                        <td>{{ r.total_quantity }}</td>
+                        <td>{{ r.unit_count }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7">Chưa có dữ liệu tổng hợp theo vật tư.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
+
+<section class="card">
+    <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:18px;">
+            Vật tư ngoài danh mục
+            <span class="badge">{{ new_materials|length }} dòng</span>
+        </summary>
+
+        <div class="table-scroll" style="margin-top:12px;">
+            <table style="table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 5ch;">
+                    <col style="width: 28ch;">
+                    <col style="width: auto;">
+                    <col style="width: 14ch;">
+                    <col style="width: 8ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 18ch;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Đơn vị</th>
+                        <th>Tên vật tư</th>
+                        <th>Loại</th>
+                        <th>ĐVT</th>
+                        <th>Số lượng</th>
+                        <th>Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in new_materials %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ r.unit_name }}</td>
+                        <td>{{ r.material_name }}</td>
+                        <td>{{ r.category_name }}</td>
+                        <td>{{ r.unit }}</td>
+                        <td>{{ r.quantity }}</td>
+                        <td>{{ r.note }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7">Không có vật tư ngoài danh mục.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
+
+<section class="card">
+    <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:18px;">
+            Chi tiết theo đơn vị
+            <span class="badge">{{ details|length }} dòng</span>
+        </summary>
+
+        <div class="table-scroll" style="margin-top:12px;">
+            <table style="table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 5ch;">
+                    <col style="width: 28ch;">
+                    <col style="width: 28ch;">
+                    <col style="width: auto;">
+                    <col style="width: 14ch;">
+                    <col style="width: 8ch;">
+                    <col style="width: 10ch;">
+                    <col style="width: 12ch;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Đơn vị</th>
+                        <th>Mã vật tư</th>
+                        <th>Tên vật tư</th>
+                        <th>Loại</th>
+                        <th>ĐVT</th>
+                        <th>Số lượng</th>
+                        <th>Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in details %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ r.unit_name }}</td>
+                        <td>{{ r.material_code }}</td>
+                        <td>{{ r.material_name }}</td>
+                        <td>{{ r.category_name }}</td>
+                        <td>{{ r.unit }}</td>
+                        <td>{{ r.quantity }}</td>
+                        <td>{{ r.note }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8">Chưa có dữ liệu chi tiết theo đơn vị.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</section>
+{% endblock %}

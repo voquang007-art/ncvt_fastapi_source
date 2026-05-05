@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}Quản trị{% endblock %}
+{% block content %}
+<h2>Quản trị người dùng và đơn vị</h2>
+<div id="admin-message" class="admin-message">{% if message %}<div class="alert success">{{ message }}</div>{% endif %}</div>
+
+<section class="card">
+    <h3>Thêm đơn vị</h3>
+    <form id="create-unit-form" method="post" action="/admin/units/create" class="inline-form">
+        <input name="name" placeholder="Tên đơn vị" required>
+        <button>Thêm đơn vị</button>
+    </form>
+    <p class="muted">Đơn vị trong phần mềm này là danh sách ngang cấp, không phân cấp cha - con.</p>
+</section>
+
+<section class="card">
+    <div class="page-title">
+        <h3>Danh sách đơn vị</h3>
+        <span class="small-note">Tự cập nhật tự động, không cần nhấn F5.</span>
+    </div>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Tên đơn vị</th>
+                    <th>Hoạt động</th>
+                    <th>Lưu</th>
+                    <th>Xóa</th>
+                </tr>
+            </thead>
+            <tbody id="units-tbody"></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card">
+    <div class="page-title">
+        <h3>Danh sách người dùng</h3>
+        <span class="small-note">Đăng ký mới, xét duyệt và thay đổi trạng thái sẽ tự cập nhật tự động.</span>
+    </div>
+    <p class="muted">Người dùng tự chọn đơn vị khi đăng ký. Quản trị hệ thống chỉ xét duyệt, khóa/mở hoạt động, phân quyền và xóa tài khoản khi phù hợp.</p>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tài khoản</th>
+                    <th>Họ tên</th>
+                    <th>Đơn vị đã đăng ký</th>
+                    <th>Vai trò/quyền</th>
+                    <th>Duyệt</th>
+                    <th>Hoạt động</th>
+                    <th>Lưu</th>
+                    <th>Xóa</th>
+                </tr>
+            </thead>
+            <tbody id="users-tbody"></tbody>
+        </table>
+    </div>
+</section>
+
+<script>
+const adminMessage = document.getElementById('admin-message');
+const unitsTbody = document.getElementById('units-tbody');
+const usersTbody = document.getElementById('users-tbody');
+const createUnitForm = document.getElementById('create-unit-form');
+const currentUserId = {{ current_user.id }};
+let adminState = {
+    units: {{ units | tojson }},
+    users: {{ users | tojson }},
+    role_labels: {{ role_labels | tojson }},
+};
+
+function showAdminMessage(message, success=true) {
+    if (!message) {
+        adminMessage.innerHTML = '';
+        return;
+    }
+    adminMessage.innerHTML = `<div class="alert ${success ? 'success' : ''}">${message}</div>`;
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function renderUnits() {
+    if (!adminState.units.length) {
+        unitsTbody.innerHTML = '<tr><td colspan="5">Chưa có đơn vị.</td></tr>';
+        return;
+    }
+    unitsTbody.innerHTML = adminState.units.map((unit, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td><input name="name" value="${escapeHtml(unit.name)}" form="unit-form-${unit.id}" required></td>
+            <td style="text-align:center"><input type="checkbox" name="is_active" form="unit-form-${unit.id}" ${unit.is_active ? 'checked' : ''}></td>
+            <td>
+                <form id="unit-form-${unit.id}" class="ajax-form" method="post" action="/admin/units/${unit.id}/update">
+                    <button>Lưu</button>
+                </form>
+            </td>
+            <td>
+                <button class="danger" type="button" onclick="deleteUnit(${unit.id})">Xóa</button>
+            </td>
+        </tr>
+    `).join('');
+    bindAjaxForms();
+}
+
+function renderUsers() {
+    if (!adminState.users.length) {
+        usersTbody.innerHTML = '<tr><td colspan="8">Chưa có người dùng.</td></tr>';
+        return;
+    }
+    usersTbody.innerHTML = adminState.users.map((user) => {
+        const options = Object.entries(adminState.role_labels || {}).map(([key, label]) => (
+            `<option value="${key}" ${user.role === key ? 'selected' : ''}>${escapeHtml(label)}</option>`
+        )).join('');
+        return `
+            <tr>
+                <td>${escapeHtml(user.username)}</td>
+                <td>${escapeHtml(user.full_name)}</td>
+                <td>${escapeHtml(user.unit_name)}</td>
+                <td>
+                    <select name="role" form="user-form-${user.id}">${options}</select>
+                </td>
+                <td style="text-align:center"><input type="checkbox" name="is_approved" form="user-form-${user.id}" ${user.is_approved ? 'checked' : ''}></td>
+                <td style="text-align:center"><input type="checkbox" name="is_active" form="user-form-${user.id}" ${user.is_active ? 'checked' : ''}></td>
+                <td>
+                    <form id="user-form-${user.id}" class="ajax-form" method="post" action="/admin/users/${user.id}/update">
+                        <button>Lưu</button>
+                    </form>
+                </td>
+                <td>
+                    ${user.id === currentUserId
+                        ? '<span class="muted">Tài khoản hiện tại</span>'
+                        : `<button class="danger" type="button" onclick="deleteUser(${user.id})">Xóa</button>`}
+                </td>
+            </tr>
+        `;
+    }).join('');
+    bindAjaxForms();
+}
+
+function renderAll() {
+    renderUnits();
+    renderUsers();
+}
+
+async function postForm(action, formData) {
+    const response = await fetch(action, {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        body: formData,
+    });
+
+    let data = {};
+    try {
+        data = await response.json();
+    } catch (error) {
+        showAdminMessage('Máy chủ chưa trả về dữ liệu JSON hợp lệ. Vui lòng kiểm tra log backend.', false);
+        return {ok: false};
+    }
+
+    if (data.units) {
+        adminState.units = data.units;
+    }
+    if (data.users) {
+        adminState.users = data.users;
+    }
+    if (data.role_labels) {
+        adminState.role_labels = data.role_labels;
+    }
+
+    renderAll();
+    showAdminMessage(data.message || (response.ok ? 'Đã cập nhật.' : 'Có lỗi xảy ra.'), response.ok && data.ok !== false);
+    return data;
+}
+
+function collectFormData(form) {
+    const formData = new FormData(form);
+
+    if (form.id) {
+        document.querySelectorAll(`[form="${form.id}"]`).forEach((control) => {
+            if (!control.name) return;
+
+            if (control.type === 'checkbox') {
+                if (control.checked) {
+                    formData.set(control.name, control.value || 'on');
+                } else {
+                    formData.delete(control.name);
+                }
+                return;
+            }
+
+            formData.set(control.name, control.value || '');
+        });
+    }
+
+    return formData;
+}
+
+function bindAjaxForms() {
+    document.querySelectorAll('.ajax-form').forEach((form) => {
+        if (form.dataset.bound === '1') return;
+        form.dataset.bound = '1';
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const formData = collectFormData(form);
+            await postForm(form.action, formData);
+        });
+    });
+}
+
+async function deleteUnit(unitId) {
+    if (!confirm('Xóa/ngưng sử dụng đơn vị này?')) return;
+    const formData = new FormData();
+    await postForm(`/admin/units/${unitId}/delete`, formData);
+}
+
+async function deleteUser(userId) {
+    if (!confirm('Xóa tài khoản này? Nếu tài khoản đã phát sinh dữ liệu, hệ thống sẽ khóa thay vì xóa cứng.')) return;
+    const formData = new FormData();
+    await postForm(`/admin/users/${userId}/delete`, formData);
+}
+
+createUnitForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const formData = new FormData(createUnitForm);
+    const data = await postForm(createUnitForm.action, formData);
+    if (data.ok) {
+        createUnitForm.reset();
+    }
+});
+
+async function loadAdminState() {
+    try {
+        const response = await fetch('/admin/api/state');
+        if (!response.ok) return;
+        const data = await response.json();
+        adminState = data;
+        renderAll();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+renderAll();
+loadAdminState();
+setInterval(function () {
+    if (document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        return;
+    }
+    loadAdminState();
+}, 5000);
+</script>
+{% endblock %}
