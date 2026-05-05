@@ -76,6 +76,7 @@
                     <col style="width: 14ch;">
                     <col style="width: 9ch;">
                     <col style="width: 10ch;">
+                    <col style="width: 18ch;">
                     <col style="width: 10ch;">
                     <col style="width: 10ch;">
                     <col style="width: 10ch;">
@@ -90,13 +91,13 @@
                         <th>Loại</th>
                         <th>ĐVT</th>
                         <th>Tổng nhu cầu</th>
+                        <th>Quy cách/Ghi chú</th>
                         <th>Tồn kho tháng</th>
                         <th>Thiếu</th>
                         <th>Dư</th>
                         <th>Đề xuất mua</th>
-                        <th>Ghi chú</th>
-                    </tr>
-                </thead>
+                        <th>Ghi chú cân đối</th>
+                    </tr>                </thead>
                 <tbody>
                 {% for r in rows %}
                     <tr>
@@ -106,6 +107,7 @@
                         <td>{{ r.category_name }}</td>
                         <td>{{ r.unit }}</td>
                         <td>{{ r.total_demand_qty }}</td>
+                        <td>{{ r.note or '' }}</td>
                         <td>{{ r.stock_qty }}</td>
                         <td>{{ r.shortage_qty }}</td>
                         <td>{{ r.surplus_qty }}</td>
@@ -114,7 +116,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="11">Chưa có dữ liệu nhu cầu đã tổng hợp/chốt trong tháng này.</td>
+                        <td colspan="12">Chưa có dữ liệu nhu cầu đã tổng hợp/chốt trong tháng này.</td>
                     </tr>
                 {% endfor %}
                 </tbody>

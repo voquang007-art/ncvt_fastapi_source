@@ -24,6 +24,24 @@ router = APIRouter(prefix="/summary", tags=["summary"])
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals.update(ROLE_LABELS=ROLE_LABELS, NAV_MONTH=date.today().month, NAV_YEAR=date.today().year)
 
+def _clean_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _fmt_qty(value: float) -> str:
+    number = float(value or 0)
+    if number.is_integer():
+        return str(int(number))
+    return f"{number:.2f}".rstrip("0").rstrip(".")
+
+
+def _build_spec_note(spec_quantities: dict[str, float]) -> str:
+    parts = []
+    for spec, qty in sorted(spec_quantities.items(), key=lambda item: item[0].lower()):
+        clean_spec = _clean_text(spec)
+        if clean_spec:
+            parts.append(f"{_fmt_qty(qty)} {clean_spec}")
+    return "; ".join(parts)
 
 def collect_summary(db: Session, month: int, year: int):
     reqs = db.query(DemandRequest).filter(
@@ -58,8 +76,17 @@ def collect_summary(db: Session, month: int, year: int):
                 "unit": key[3],
                 "total_quantity": 0,
                 "unit_count": 0,
+                "spec_quantities": defaultdict(float),
+                "note": "",
             }
-        grouped[key]["total_quantity"] += item.quantity
+
+        quantity_value = float(item.quantity or 0)
+        grouped[key]["total_quantity"] += quantity_value
+
+        spec_note = _clean_text(item.specification or item.note)
+        if spec_note:
+            grouped[key]["spec_quantities"][spec_note] += quantity_value
+
         unit_name = unit_by_req.get(item.request_id, "")
         unit_sets[key].add(unit_name)
 
@@ -70,7 +97,7 @@ def collect_summary(db: Session, month: int, year: int):
             "category_name": item.category_name,
             "unit": item.unit,
             "quantity": item.quantity,
-            "note": item.note or "",
+            "note": _clean_text(item.specification or item.note),
         }
         details.append(detail)
         if item.is_new_material:
@@ -79,6 +106,7 @@ def collect_summary(db: Session, month: int, year: int):
     rows = []
     for key, row in grouped.items():
         row["unit_count"] = len(unit_sets[key])
+        row["note"] = _build_spec_note(row.pop("spec_quantities", {}))
         rows.append(row)
     rows.sort(key=lambda x: (x["category_name"], x["material_name"]))
     details.sort(key=lambda x: (x["unit_name"], x["category_name"], x["material_name"]))

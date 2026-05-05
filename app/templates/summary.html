@@ -64,17 +64,18 @@
 
         <div class="table-scroll" style="margin-top:12px;">
             <table style="table-layout: fixed;">
-                <colgroup>
+                 <colgroup>
                     <col style="width: 5ch;">
-                    <col style="width: 28ch;">
+                    <col style="width: 26ch;">
                     <col style="width: auto;">
                     <col style="width: 14ch;">
                     <col style="width: 7ch;">
                     <col style="width: 10ch;">
                     <col style="width: 8ch;">
+                    <col style="width: 24ch;">
                 </colgroup>
                 <thead>
-                    <tr>
+                     <tr>
                         <th>STT</th>
                         <th>Mã vật tư</th>
                         <th>Tên vật tư</th>
@@ -82,6 +83,7 @@
                         <th>ĐVT</th>
                         <th>Tổng số lượng</th>
                         <th>Số đơn vị</th>
+                        <th>Quy cách/Ghi chú</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,10 +96,11 @@
                         <td>{{ r.unit }}</td>
                         <td>{{ r.total_quantity }}</td>
                         <td>{{ r.unit_count }}</td>
+                        <td>{{ r.note or '' }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="7">Chưa có dữ liệu tổng hợp theo vật tư.</td>
+                        <td colspan="8">Chưa có dữ liệu tổng hợp theo vật tư.</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -132,7 +135,7 @@
                         <th>Loại</th>
                         <th>ĐVT</th>
                         <th>Số lượng</th>
-                        <th>Ghi chú</th>
+                        <th>Quy cách/Ghi chú</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -185,7 +188,7 @@
                         <th>Loại</th>
                         <th>ĐVT</th>
                         <th>Số lượng</th>
-                        <th>Ghi chú</th>
+                        <th>Quy cách/Ghi chú</th>
                     </tr>
                 </thead>
                 <tbody>

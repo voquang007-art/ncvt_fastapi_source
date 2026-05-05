@@ -234,17 +234,35 @@ def build_summary_excel(rows: list[dict], detail_rows: list[dict], new_material_
     wb = Workbook()
     ws = wb.active
     ws.title = "Tổng hợp vật tư"
-    ws.append(["STT", "Mã vật tư", "Tên vật tư", "Loại", "ĐVT", "Tổng số lượng", "Số đơn vị đăng ký"])
+    ws.append([
+        "STT",
+        "Mã vật tư",
+        "Tên vật tư",
+        "Loại",
+        "ĐVT",
+        "Tổng số lượng",
+        "Số đơn vị đăng ký",
+        "Quy cách/Ghi chú",
+    ])
     for idx, row in enumerate(rows, 1):
-        ws.append([idx, row["material_code"], row["material_name"], row["category_name"], row["unit"], row["total_quantity"], row["unit_count"]])
-
+        ws.append([
+            idx,
+            row["material_code"],
+            row["material_name"],
+            row["category_name"],
+            row["unit"],
+            row["total_quantity"],
+            row["unit_count"],
+            row.get("note", ""),
+        ])
+        
     ws2 = wb.create_sheet("Chi tiết đơn vị")
-    ws2.append(["STT", "Đơn vị", "Mã vật tư", "Tên vật tư", "Loại", "ĐVT", "Số lượng", "Ghi chú"])
+    ws2.append(["STT", "Đơn vị", "Mã vật tư", "Tên vật tư", "Loại", "ĐVT", "Số lượng", "Quy cách/Ghi chú"])
     for idx, row in enumerate(detail_rows, 1):
         ws2.append([idx, row["unit_name"], row["material_code"], row["material_name"], row["category_name"], row["unit"], row["quantity"], row["note"]])
 
     ws3 = wb.create_sheet("Ngoài danh mục")
-    ws3.append(["STT", "Đơn vị", "Tên vật tư đề xuất", "Loại", "ĐVT", "Số lượng", "Ghi chú"])
+    ws3.append(["STT", "Đơn vị", "Tên vật tư đề xuất", "Loại", "ĐVT", "Số lượng", "Quy cách/Ghi chú"])
     for idx, row in enumerate(new_material_rows, 1):
         ws3.append([idx, row["unit_name"], row["material_name"], row["category_name"], row["unit"], row["quantity"], row["note"]])
 

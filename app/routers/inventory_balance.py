@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, datetime
 from io import BytesIO
 import unicodedata
@@ -59,6 +60,22 @@ def _to_float(value: object) -> float:
         return 0.0
 
 
+def _fmt_qty(value: float) -> str:
+    number = float(value or 0)
+    if number.is_integer():
+        return str(int(number))
+    return f"{number:.2f}".rstrip("0").rstrip(".")
+
+
+def _build_spec_note(spec_quantities: dict[str, float]) -> str:
+    parts = []
+    for spec, qty in sorted(spec_quantities.items(), key=lambda item: item[0].lower()):
+        clean_spec = _norm(spec)
+        if clean_spec:
+            parts.append(f"{_fmt_qty(qty)} {clean_spec}")
+    return "; ".join(parts)
+
+
 def _find_col(headers: list[str], candidates: list[str]) -> int | None:
     normalized_headers = [_norm_header(header) for header in headers]
     normalized_candidates = [_norm_header(candidate) for candidate in candidates]
@@ -115,12 +132,25 @@ def collect_demand_totals(db: Session, month: int, year: int) -> list[dict]:
                 "category_name": item.category_name,
                 "total_demand_qty": 0.0,
                 "is_new_material": bool(item.is_new_material),
+                "spec_quantities": defaultdict(float),
+                "note": "",
             }
-        grouped[key]["total_demand_qty"] += float(item.quantity or 0)
+
+        quantity_value = float(item.quantity or 0)
+        grouped[key]["total_demand_qty"] += quantity_value
+
+        spec_note = _norm(item.specification or item.note)
+        if spec_note:
+            grouped[key]["spec_quantities"][spec_note] += quantity_value
+
         if item.is_new_material:
             grouped[key]["is_new_material"] = True
 
-    rows = list(grouped.values())
+    rows = []
+    for row in grouped.values():
+        row["note"] = _build_spec_note(row.pop("spec_quantities", {}))
+        rows.append(row)
+
     rows.sort(key=lambda x: (x["category_name"], x["material_name"]))
     return rows
 
@@ -193,6 +223,7 @@ def collect_balance_rows(db: Session, month: int, year: int) -> tuple[InventoryS
                 "shortage_qty": shortage,
                 "surplus_qty": surplus,
                 "suggested_purchase_qty": shortage,
+                "note": demand.get("note", ""),
                 "status_note": status_note,
                 "snapshot_id": snapshot.id if snapshot else None,
             }
@@ -353,7 +384,7 @@ def export_balance_excel(
     ws.append([f"BẢNG CÂN ĐỐI NHU CẦU VẬT TƯ THÁNG {month}/{year}"])
     ws.append(["Ngày chốt tồn", snapshot.snapshot_date.strftime("%d/%m/%Y") if snapshot else "Chưa import tồn kho"])
     ws.append([])
-    ws.append(["STT", "Mã vật tư", "Tên vật tư", "Loại", "ĐVT", "Tổng nhu cầu", "Tồn kho tháng", "Thiếu", "Dư", "Đề xuất mua", "Ghi chú"])
+    ws.append(["STT", "Mã vật tư", "Tên vật tư", "Loại", "ĐVT", "Tổng nhu cầu", "Quy cách/Ghi chú", "Tồn kho tháng", "Thiếu", "Dư", "Đề xuất mua", "Ghi chú cân đối"])
     for idx, row in enumerate(rows, 1):
         ws.append([
             idx,
@@ -362,6 +393,7 @@ def export_balance_excel(
             row["category_name"],
             row["unit"],
             row["total_demand_qty"],
+            row.get("note", ""),
             row["stock_qty"],
             row["shortage_qty"],
             row["surplus_qty"],
